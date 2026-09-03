@@ -1,0 +1,678 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+// ==========================================
+// 1. SAAS & TENANT MANAGEMENT
+// ==========================================
+
+enum SubscriptionPlanTier {
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+model Tenant {
+  id             String             @id @default(cuid())
+  name           String
+  slug           String             @unique
+  customDomain   String?            @unique
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String             @default("#10B981")
+  secondaryColor String             @default("#1F2937")
+  coverImageUrl  String?
+  status         String             @default("ACTIVE")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  settings       TenantSettings?
+  subscriptions  Subscription[]
+  users          User[]
+  outlets        Outlet[]
+  serviceTypes   ServicePointType[]
+  servicePoints  ServicePoint[]
+  categories     Category[]
+  products       Product[]
+  modifierGroups ModifierGroup[]
+  orders         Order[]
+  sessions       ServicePointSession[]
+  serviceRequests ServiceRequest[]
+  inventoryItems InventoryItem[]
+  recipes        Recipe[]
+  suppliers      Supplier[]
+  purchaseOrders PurchaseOrder[]
+  wastes         Waste[]
+  customers      Customer[]
+  media          Media[]
+  auditLogs      AuditLog[]
+  automations    Automation[]
+
+  @@index([slug])
+}
+
+model TenantSettings {
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  currency              String   @default("IDR")
+  timezone              String   @default("Asia/Jakarta")
+  taxPercentage         Float    @default(10.0)
+  servicePercentage     Float    @default(5.0)
+  enableRounding        Boolean  @default(true)
+  
+  callingVoiceGender    String   @default("FEMALE")
+  callingAutoRepeat     Int      @default(2)
+  callingDelaySec       Int      @default(5)
+  
+  receiptHeader         String?
+  receiptFooter         String?
+  receiptAutoPrint      Boolean  @default(false)
+  receiptWidth          String   @default("80mm")
+
+  waApiEndpoint         String?
+  waApiKey              String?
+  
+  updatedAt             DateTime @updatedAt
+}
+
+model Plan {
+  id               String               @id @default(cuid())
+  name             String
+  tier             SubscriptionPlanTier @default(STARTER)
+  monthlyPrice     Float
+  maxOutlets       Int                  @default(1)
+  maxServicePoints Int                  @default(20)
+  maxUsers         Int                  @default(5)
+  maxMenuProducts  Int                  @default(50)
+  features         Json
+  createdAt        DateTime             @default(now())
+
+  subscriptions    Subscription[]
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  tenantId  String
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      Plan               @relation(fields: [planId], references: [id])
+  status    SubscriptionStatus @default(TRIAL)
+  startDate DateTime           @default(now())
+  endDate   DateTime
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([tenantId])
+}
+
+// ==========================================
+// 2. USERS, ROLES & RBAC
+// ==========================================
+
+enum SystemRole {
+  SUPER_ADMIN
+  RESTAURANT_OWNER
+  MANAGER
+  CASHIER
+  WAITER
+  KITCHEN
+  INVENTORY_STAFF
+}
+
+model User {
+  id           String     @id @default(cuid())
+  tenantId     String?
+  tenant       Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String     @unique
+  passwordHash String
+  phone        String?
+  role         SystemRole @default(WAITER)
+  isActive     Boolean    @default(true)
+  outletId     String?
+  outlet       Outlet?    @relation(fields: [outletId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  assignedRequests ServiceRequest[] @relation("AssignedWaiter")
+  auditLogs        AuditLog[]
+
+  @@index([tenantId])
+}
+
+model Outlet {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users         User[]
+  servicePoints ServicePoint[]
+  orders        Order[]
+  sessions      ServicePointSession[]
+  inventory       InventoryItem[]
+  serviceRequests ServiceRequest[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+// ==========================================
+// 3. SERVICE POINTS & QR CODES
+// ==========================================
+
+enum ServicePointStatus {
+  AVAILABLE
+  OCCUPIED
+  BILLING
+  DISABLED
+}
+
+model ServicePointType {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  createdAt DateTime @default(now())
+
+  servicePoints ServicePoint[]
+
+  @@unique([tenantId, code])
+}
+
+model ServicePoint {
+  id           String             @id @default(cuid())
+  tenantId     String
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outletId     String
+  outlet       Outlet             @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  typeId       String
+  type         ServicePointType   @relation(fields: [typeId], references: [id])
+  internalCode String
+  displayName  String
+  capacity     Int                @default(4)
+  area         String?
+  status       ServicePointStatus @default(AVAILABLE)
+  qrSecretKey  String             @default(cuid())
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+
+  sessions        ServicePointSession[]
+  orders          Order[]
+  serviceRequests ServiceRequest[]
+
+  @@unique([tenantId, outletId, internalCode])
+  @@index([tenantId, outletId])
+}
+
+// ==========================================
+// 4. CUSTOMER GROUP SESSIONS
+// ==========================================
+
+enum SessionStatus {
+  OPEN
+  ACTIVE
+  CHECKOUT
+  ORDER_CREATED
+  BILLING
+  CLOSED
+}
+
+model ServicePointSession {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outletId       String
+  outlet         Outlet        @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  servicePointId String
+  servicePoint   ServicePoint  @relation(fields: [servicePointId], references: [id], onDelete: Cascade)
+  sessionCode    String        @unique
+  status         SessionStatus @default(OPEN)
+  openedAt       DateTime      @default(now())
+  closedAt       DateTime?
+
+  participants    Participant[]
+  orders          Order[]
+  serviceRequests ServiceRequest[]
+  carts           Cart[]
+
+  @@index([tenantId, servicePointId, status])
+}
+
+model Participant {
+  id           String              @id @default(cuid())
+  sessionId    String
+  session      ServicePointSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name         String
+  deviceToken  String?
+  isHost       Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  lastActiveAt DateTime            @default(now())
+
+  cart       Cart?
+  orderItems OrderItem[]
+
+  @@index([sessionId])
+}
+
+model Cart {
+  id            String              @id @default(cuid())
+  sessionId     String
+  session       ServicePointSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participantId String              @unique
+  participant   Participant         @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  items CartItem[]
+
+  @@index([sessionId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  notes     String?
+  modifiers Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cartId])
+}
+
+// ==========================================
+// 5. PRODUCTS, CATEGORIES & MODIFIERS
+// ==========================================
+
+model Category {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int       @default(0)
+  products  Product[]
+
+  @@index([tenantId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  sku         String?
+  isAvailable Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modifierGroups ProductModifierGroup[]
+  recipe         Recipe?
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+
+  @@index([tenantId, categoryId])
+}
+
+model ModifierGroup {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  isRequired Boolean  @default(false)
+  minSelect  Int      @default(0)
+  maxSelect  Int      @default(1)
+  
+  modifiers  Modifier[]
+  products   ProductModifierGroup[]
+
+  @@index([tenantId])
+}
+
+model ProductModifierGroup {
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  modifierGroupId String
+  modifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@id([productId, modifierGroupId])
+}
+
+model Modifier {
+  id              String        @id @default(cuid())
+  modifierGroupId String
+  modifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  name            String
+  price           Float         @default(0)
+  isAvailable     Boolean       @default(true)
+
+  orderItemModifiers OrderItemModifier[]
+}
+
+// ==========================================
+// 6. ORDERS, KITCHEN & PAYMENTS
+// ==========================================
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  COOKING
+  READY
+  CALLED
+  PICKED_UP
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  DEBIT
+  CREDIT
+  E_WALLET
+  TRANSFER
+}
+
+model Order {
+  id             String              @id @default(cuid())
+  tenantId       String
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outletId       String
+  outlet         Outlet              @relation(fields: [outletId], references: [id])
+  servicePointId String
+  servicePoint   ServicePoint        @relation(fields: [servicePointId], references: [id])
+  sessionId      String
+  session        ServicePointSession @relation(fields: [sessionId], references: [id])
+  orderNumber       String
+  mainCustomerName  String?
+  mainCustomerPhone String?
+  
+  subtotal       Float
+  taxAmount      Float
+  serviceAmount  Float
+  discountAmount Float               @default(0)
+  totalAmount    Float
+  
+  status         OrderStatus         @default(NEW)
+  paymentStatus  PaymentStatus       @default(UNPAID)
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([tenantId, status])
+  @@index([sessionId])
+}
+
+model OrderItem {
+  id            String       @id @default(cuid())
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  participantId String?
+  participant   Participant? @relation(fields: [participantId], references: [id])
+  productId     String
+  product       Product      @relation(fields: [productId], references: [id])
+  quantity      Int
+  unitPrice     Float
+  totalPrice    Float
+  notes         String?
+  status        OrderStatus  @default(NEW)
+
+  modifiers OrderItemModifier[]
+
+  @@index([orderId])
+}
+
+model OrderItemModifier {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierId  String
+  modifier    Modifier  @relation(fields: [modifierId], references: [id])
+  price       Float
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method        PaymentMethod @default(CASH)
+  amount        Float
+  referenceNo   String?
+  paidAt        DateTime      @default(now())
+  cashierUserId String?
+}
+
+// ==========================================
+// 7. CALLING & WAITER SERVICE REQUEST QUEUE
+// ==========================================
+
+enum RequestPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ServiceRequestType {
+  CALL_WAITER
+  REQUEST_BILL
+  ADD_ORDER
+  GENERAL_HELP
+}
+
+enum ServiceRequestStatus {
+  PENDING
+  CLAIMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ServiceRequest {
+  id             String               @id @default(cuid())
+  tenantId       String
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outletId       String
+  outlet         Outlet               @relation(fields: [outletId], references: [id])
+  servicePointId String
+  servicePoint   ServicePoint         @relation(fields: [servicePointId], references: [id])
+  sessionId      String
+  session        ServicePointSession  @relation(fields: [sessionId], references: [id])
+  type           ServiceRequestType   @default(CALL_WAITER)
+  priority       RequestPriority      @default(NORMAL)
+  status         ServiceRequestStatus @default(PENDING)
+  assignedUserId String?
+  assignedUser   User?                @relation("AssignedWaiter", fields: [assignedUserId], references: [id])
+  notes          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([tenantId, status, priority])
+}
+
+// ==========================================
+// 8. INVENTORY, RESEP BOM & WASTE
+// ==========================================
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outletId     String
+  outlet       Outlet   @relation(fields: [outletId], references: [id])
+  name         String
+  sku          String
+  unit         String
+  currentStock Float    @default(0)
+  minStock     Float    @default(10)
+  costPerUnit  Float    @default(0)
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  createdAt    DateTime @default(now())
+
+  recipeItems RecipeItem[]
+  movements   StockMovement[]
+  wastes      Waste[]
+
+  @@unique([tenantId, outletId, sku])
+}
+
+model Recipe {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productId String   @unique
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  items RecipeItem[]
+}
+
+model RecipeItem {
+  id              String        @id @default(cuid())
+  recipeId        String
+  recipe          Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  quantity        Float
+}
+
+model StockMovement {
+  id              String        @id @default(cuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  type            String
+  quantity        Float
+  referenceNumber String?
+  createdAt       DateTime      @default(now())
+}
+
+model Supplier {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name     String
+  contact  String?
+  phone    String?
+
+  items          InventoryItem[]
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  status     String   @default("PENDING")
+  totalCost  Float
+  createdAt  DateTime @default(now())
+}
+
+model Waste {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  quantity        Float
+  reason          String
+  cost            Float
+  createdAt       DateTime      @default(now())
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  email        String?
+  visitCount   Int      @default(1)
+  totalSpend   Float    @default(0)
+  points       Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, phone])
+}
+
+// ==========================================
+// 9. MEDIA STORAGE & AUTOMATION
+// ==========================================
+
+model Media {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fileId    String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  driveUrl  String
+  folder    String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model Automation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  whenEvent String
+  thenAction String
+  config    Json?
+  isActive  Boolean  @default(true)
+}
