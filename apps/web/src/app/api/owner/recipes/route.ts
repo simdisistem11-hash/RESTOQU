@@ -1,42 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initialStockItems } from '../inventory/route';
-import { initialProducts } from '../menu/route';
-
-export let initialRecipes: { [productId: string]: any[] } = {
-  p1: [
-    { ingredientName: 'Beras Premium', quantityNeeded: 0.2, unit: 'kg' },
-    { ingredientName: 'Daging Ayam Broiler', quantityNeeded: 0.05, unit: 'kg' },
-    { ingredientName: 'Minyak Goreng', quantityNeeded: 0.02, unit: 'liter' }
-  ],
-  p2: [
-    { ingredientName: 'Daging Ayam Broiler', quantityNeeded: 0.25, unit: 'kg' },
-    { ingredientName: 'Beras Premium', quantityNeeded: 0.2, unit: 'kg' },
-    { ingredientName: 'Minyak Goreng', quantityNeeded: 0.03, unit: 'liter' }
-  ],
-  p3: [
-    { ingredientName: 'Biji Kopi Arabika', quantityNeeded: 0.018, unit: 'kg' },
-    { ingredientName: 'Susu UHT Full Cream', quantityNeeded: 0.12, unit: 'liter' },
-    { ingredientName: 'Gula Aren Cair', quantityNeeded: 0.025, unit: 'liter' }
-  ],
-  p4: [
-    { ingredientName: 'Gula Aren Cair', quantityNeeded: 0.02, unit: 'liter' }
-  ],
-  p5: [
-    { ingredientName: 'Tepung Tapioka Cireng', quantityNeeded: 0.15, unit: 'kg' },
-    { ingredientName: 'Minyak Goreng', quantityNeeded: 0.05, unit: 'liter' }
-  ]
-};
-
-export function calculateHppForProduct(productId: string) {
-  const recipe = initialRecipes[productId] || [];
-  let totalHpp = 0;
-  recipe.forEach(item => {
-    const inv = initialStockItems.find(i => i.name.toLowerCase() === item.ingredientName.toLowerCase());
-    const costPerUnit = inv ? inv.costPerUnit : 15000;
-    totalHpp += Math.round(costPerUnit * item.quantityNeeded);
-  });
-  return totalHpp;
-}
+import { initialStockItems, initialProducts, initialRecipes, calculateHppForProduct } from '@/lib/store';
 
 export async function GET(request: Request) {
   try {

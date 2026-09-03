@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { shiftHistory } from '../../cashier/shift/open/route';
+import { shiftHistory } from '@/lib/store';
 
 export async function GET(request: Request) {
   try {

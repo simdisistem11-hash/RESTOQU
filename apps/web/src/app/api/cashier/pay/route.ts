@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma, PaymentStatus, PaymentMethod } from '@restoqu/database';
-import { deductStockForRecipeItem } from '../../owner/inventory/route';
-import { initialRecipes } from '../../owner/recipes/route';
+import { deductStockForRecipeItem, initialRecipes } from '@/lib/store';
 
 export async function POST(request: Request) {
   try {

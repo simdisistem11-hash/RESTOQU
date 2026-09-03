@@ -1,26 +1,5 @@
 import { NextResponse } from 'next/server';
-
-export let currentActiveShift: any = null;
-export let shiftHistory: any[] = [
-  {
-    id: 'shift-prev-101',
-    cashierName: 'Budi Kasir (Pagi)',
-    startTime: new Date(Date.now() - 3600000 * 10).toISOString(),
-    endTime: new Date(Date.now() - 3600000 * 2).toISOString(),
-    status: 'CLOSED',
-    startingCash: 200000,
-    expectedCash: 850000,
-    actualEndingCash: 850000,
-    differenceAmount: 0,
-    differenceStatus: 'PAS',
-    totalCashSales: 650000,
-    totalNonCashSales: 420000,
-    totalSales: 1070000,
-    totalOrdersCount: 14,
-    notes: 'Shift Pagi Lancar, Uang Pas.',
-    createdAt: new Date(Date.now() - 3600000 * 10).toISOString()
-  }
-];
+import { currentActiveShift, setCurrentActiveShift } from '@/lib/store';
 
 export async function POST(request: Request) {
   try {
@@ -46,7 +25,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString()
     };
 
-    currentActiveShift = newShift;
+    setCurrentActiveShift(newShift);
 
     return NextResponse.json({
       success: true,

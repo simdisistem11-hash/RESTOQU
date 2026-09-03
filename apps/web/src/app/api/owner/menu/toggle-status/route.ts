@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initialProducts } from '../route';
+import { initialProducts } from '@/lib/store';
 import { prisma } from '@restoqu/database';
 
 export async function POST(request: Request) {

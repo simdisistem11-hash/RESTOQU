@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { currentActiveShift, shiftHistory } from '../open/route';
+import { currentActiveShift, setCurrentActiveShift, shiftHistory } from '@/lib/store';
 
 export async function POST(request: Request) {
   try {
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     };
 
     shiftHistory.unshift(closedShift);
+    setCurrentActiveShift(null);
 
     return NextResponse.json({
       success: true,
