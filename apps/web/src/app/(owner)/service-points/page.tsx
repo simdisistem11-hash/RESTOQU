@@ -227,6 +227,11 @@ export default function ServicePointsPage() {
               <button onClick={() => window.print()} style={{ flex: 1, padding: 12, borderRadius: 14, background: '#247d68', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <Printer size={16} /> Cetak QR
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* FIXED OWNER BOTTOM NAVBAR */}
       <nav style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
