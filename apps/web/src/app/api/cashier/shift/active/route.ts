@@ -16,11 +16,11 @@ export async function GET(request: Request) {
   }
 }
 
-export async function setActiveShiftData(shift: any) {
+async function setActiveShiftData(shift: any) {
   activeShift = shift;
   if (shift) globalShifts.unshift(shift);
 }
 
-export async function getGlobalShiftsData() {
+async function getGlobalShiftsData() {
   return globalShifts;
 }
