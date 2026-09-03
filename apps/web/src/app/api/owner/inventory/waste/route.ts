@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initialStockItems, initialWasteLogs } from '../route';
+import { initialStockItems, initialWasteLogs } from '@/lib/store';
 
 export async function POST(request: Request) {
   try {
