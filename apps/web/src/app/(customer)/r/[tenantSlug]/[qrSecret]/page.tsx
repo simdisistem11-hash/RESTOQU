@@ -46,6 +46,19 @@ export default function CustomerGroupSessionPage() {
   // Service Request Feedback
   const [serviceSuccessMsg, setServiceSuccessMsg] = useState<string>('');
 
+  // Active Promo Vouchers State
+  const [vouchers, setVouchers] = useState<any[]>([]);
+
+  const fetchActiveVouchers = async () => {
+    try {
+      const res = await fetch('/api/owner/loyalty/vouchers');
+      const data = await res.json();
+      if (data.success && data.vouchers) {
+        setVouchers(data.vouchers);
+      }
+    } catch (e) {}
+  };
+
   // 1. Initial Load: Get or Create Session
   const initSession = async () => {
     try {
@@ -168,6 +181,7 @@ export default function CustomerGroupSessionPage() {
 
   useEffect(() => {
     initSession();
+    fetchActiveVouchers();
   }, []);
 
   useEffect(() => {
@@ -353,6 +367,38 @@ export default function CustomerGroupSessionPage() {
       {/* Main View Tabs */}
       {activeTab === 'menu' && (
         <main style={{ padding: '0 20px' }}>
+          {/* Active Promo Vouchers Carousel */}
+          {vouchers && vouchers.length > 0 && (
+            <div style={{ marginBottom: 14, overflowX: 'auto', display: 'flex', gap: 10, paddingBottom: 4 }}>
+              {vouchers.map(v => (
+                <div
+                  key={v.id}
+                  style={{
+                    minWidth: 210,
+                    background: 'linear-gradient(135deg, #f7eadc 0%, #fef3c7 100%)',
+                    borderRadius: 16,
+                    padding: '10px 14px',
+                    border: '1px solid #fde68a',
+                    flexShrink: 0
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#247d68', letterSpacing: 0.5 }}>{v.code}</span>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: '#ffffff', color: '#b45309' }}>
+                      {v.discountType === 'PERCENT' ? `${v.discountValue}% OFF` : `Hemat Rp${Math.round(v.discountValue / 1000)}k`}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d2925', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {v.title}
+                  </p>
+                  <p style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: 2 }}>
+                    Min. belanja Rp{v.minSpend?.toLocaleString('id-ID')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Category Filter Pills */}
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, marginBottom: 14 }}>
             {categories.map(cat => (

@@ -5,7 +5,7 @@ import {
   CreditCard, DollarSign, QrCode, Printer, CheckCircle, RefreshCw, ArrowLeft,
   Search, Plus, Minus, ShoppingBag, X, Sparkles, Send, Gift, Tag, UserCheck,
   Calendar, History, TrendingUp, Receipt, Clock, Filter, Lock, Unlock, ShieldCheck,
-  AlertTriangle, Check, Wallet, User
+  AlertTriangle, Check, Wallet, User, Ticket
 } from 'lucide-react';
 import Link from 'next/link';
 import { ReceiptModal } from '@/components/receipt-modal';
@@ -173,7 +173,13 @@ export default function CashierPOSPage() {
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [customerPhoneInput, setCustomerPhoneInput] = useState('');
   const [customerLoyalty, setCustomerLoyalty] = useState<any | null>(null);
+  const [customerTier, setCustomerTier] = useState<any | null>(null);
   const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+
+  // Voucher Promo State
+  const [voucherInput, setVoucherInput] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<any | null>(null);
+  const [voucherDiscountAmount, setVoucherDiscountAmount] = useState<number>(0);
 
   const fetchUnpaidOrders = async () => {
     try {
@@ -526,7 +532,11 @@ export default function CashierPOSPage() {
     setDiscountType('NOMINAL');
     setCustomerPhoneInput(order.mainCustomerPhone || '');
     setCustomerLoyalty(null);
+    setCustomerTier(null);
     setUseLoyaltyPoints(false);
+    setVoucherInput('');
+    setAppliedVoucher(null);
+    setVoucherDiscountAmount(0);
     setReceipt(null);
 
     if (order.mainCustomerPhone) {
@@ -562,7 +572,7 @@ export default function CashierPOSPage() {
     setSelectedOrder(ord);
   };
 
-  // Lookup Loyalty Customer
+  // Lookup Loyalty Customer & Tier
   const lookupCustomerLoyalty = async (phone: string) => {
     if (!phone || phone.length < 8) return;
     try {
@@ -571,11 +581,49 @@ export default function CashierPOSPage() {
         const data = await res.json();
         if (data.customer) {
           setCustomerLoyalty(data.customer);
+          if (data.customer.tierInfo) {
+            setCustomerTier(data.customer.tierInfo);
+          }
         }
       }
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // Apply Voucher Promo
+  const handleApplyVoucher = async () => {
+    if (!voucherInput.trim() || !selectedOrder) return;
+    try {
+      const res = await fetch('/api/promos/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: voucherInput,
+          subtotal: selectedOrder.totalAmount,
+          customerPhone: customerPhoneInput
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedVoucher(data.voucher);
+        setVoucherDiscountAmount(data.discountAmount);
+        if (data.customerTierBenefit) {
+          setCustomerTier(data.customerTierBenefit);
+        }
+        alert(data.message);
+      } else {
+        alert(data.error || 'Voucher tidak valid');
+      }
+    } catch (e) {
+      alert('Gagal memvalidasi voucher');
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherDiscountAmount(0);
+    setVoucherInput('');
   };
 
   // Search Order by QR Code or Order Number
@@ -613,7 +661,7 @@ export default function CashierPOSPage() {
     }
   };
 
-  // Calculate Net Tagihan considering Discount & Points
+  // Calculate Net Tagihan considering Discount, Points & Voucher
   const calculateFinalTotal = () => {
     if (!selectedOrder) return 0;
     let disc = 0;
@@ -624,7 +672,8 @@ export default function CashierPOSPage() {
     }
 
     const pointsDisc = (useLoyaltyPoints && customerLoyalty) ? (customerLoyalty.points * 100) : 0;
-    return Math.max(0, selectedOrder.totalAmount - disc - pointsDisc);
+    const totalDeductions = disc + pointsDisc + (voucherDiscountAmount || 0);
+    return Math.max(0, selectedOrder.totalAmount - totalDeductions);
   };
 
   const finalTotalAmount = calculateFinalTotal();
@@ -641,6 +690,8 @@ export default function CashierPOSPage() {
       discountRp = Math.min(selectedOrder.totalAmount, Math.max(0, discountValue));
     }
 
+    const totalDiscountRp = discountRp + (voucherDiscountAmount || 0);
+
     try {
       const res = await fetch('/api/cashier/pay', {
         method: 'POST',
@@ -650,7 +701,7 @@ export default function CashierPOSPage() {
           orderNumber: selectedOrder.orderNumber,
           method: paymentMethod,
           amountPaid: Number(amountPaid),
-          discountAmount: discountRp,
+          discountAmount: totalDiscountRp,
           customerPhone: customerPhoneInput,
           pointsUsed: useLoyaltyPoints && customerLoyalty ? customerLoyalty.points : 0
         })
@@ -1602,14 +1653,69 @@ export default function CashierPOSPage() {
                   />
                 </div>
 
+                {/* Voucher Promo Input */}
+                <div style={{ marginBottom: 14, background: '#f8fafc', padding: 12, borderRadius: 16, border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Ticket size={14} style={{ color: '#247d68' }} /> VOUCHER PROMO / KUPON
+                    </span>
+                    {appliedVoucher && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534' }}>
+                        Potongan: <strong>-Rp{voucherDiscountAmount.toLocaleString('id-ID')}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  {!appliedVoucher ? (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        type="text"
+                        value={voucherInput}
+                        onChange={e => setVoucherInput(e.target.value.toUpperCase())}
+                        placeholder="Contoh: RESTOQU25K / HAPPYHOUR20"
+                        style={{ flex: 1, padding: '8px 12px', borderRadius: 10, background: '#ffffff', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 800, letterSpacing: 1, outline: 'none' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyVoucher}
+                        style={{ padding: '8px 14px', borderRadius: 10, background: '#247d68', color: '#fff', border: 'none', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        Klaim
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#dcfce7', padding: '8px 12px', borderRadius: 10, border: '1px solid #86efac' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#166534' }}>{appliedVoucher.code}</span>
+                        <span style={{ fontSize: '0.72rem', color: '#15803d' }}>• {appliedVoucher.title}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveVoucher}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Loyalty & Tier Membership */}
                 <div style={{ marginBottom: 16, background: '#f0fdf4', padding: 12, borderRadius: 16, border: '1px solid #bbf7d0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Gift size={14} /> LOYALTY MEMBER
+                      <Gift size={14} /> LOYALTY MEMBER & TIER
                     </span>
-                    {customerLoyalty && (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534' }}>
-                        Poin: <strong>{customerLoyalty.points} Poin</strong>
+                    {customerTier && (
+                      <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 900,
+                        padding: '2px 8px',
+                        borderRadius: 9999,
+                        background: customerTier.bgBadge,
+                        color: customerTier.color
+                      }}>
+                        {customerTier.tier} TIER
                       </span>
                     )}
                   </div>
@@ -1627,19 +1733,24 @@ export default function CashierPOSPage() {
                       onClick={() => lookupCustomerLoyalty(customerPhoneInput)}
                       style={{ padding: '8px 12px', borderRadius: 10, background: '#166534', color: '#fff', border: 'none', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}
                     >
-                      Cek Poin
+                      Cek Poin & Tier
                     </button>
                   </div>
 
-                  {customerLoyalty && customerLoyalty.points > 0 && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={useLoyaltyPoints}
-                        onChange={e => setUseLoyaltyPoints(e.target.checked)}
-                      />
-                      Tukarkan {customerLoyalty.points} Poin (Diskon Rp{(customerLoyalty.points * 100).toLocaleString('id-ID')})
-                    </label>
+                  {customerLoyalty && (
+                    <div style={{ marginTop: 8, fontSize: '0.78rem', color: '#166534', fontWeight: 700 }}>
+                      <div>Poin Tersedia: <strong>{customerLoyalty.points} Poin</strong></div>
+                      {customerLoyalty.points > 0 && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={useLoyaltyPoints}
+                            onChange={e => setUseLoyaltyPoints(e.target.checked)}
+                          />
+                          Tukarkan {customerLoyalty.points} Poin (Diskon Rp{(customerLoyalty.points * 100).toLocaleString('id-ID')})
+                        </label>
+                      )}
+                    </div>
                   )}
                 </div>
 

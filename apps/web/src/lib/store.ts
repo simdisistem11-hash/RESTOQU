@@ -188,3 +188,166 @@ export function calculateHppForProduct(productId: string) {
   });
   return totalHpp;
 }
+
+// 5. Vouchers, Promos & Tier Membership
+export interface VoucherPromo {
+  id: string;
+  code: string;
+  title: string;
+  discountType: 'PERCENT' | 'NOMINAL';
+  discountValue: number;
+  minSpend: number;
+  maxDiscount?: number;
+  expiryDate: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'INACTIVE';
+  usageLimit?: number;
+  usedCount: number;
+  isHappyHour?: boolean;
+  happyHourStart?: string;
+  happyHourEnd?: string;
+}
+
+export type CustomerTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+
+export interface TierInfo {
+  tier: CustomerTier;
+  label: string;
+  color: string;
+  bgBadge: string;
+  discountPercent: number;
+  minPoints: number;
+  nextTierPoints: number | null;
+}
+
+export function getTierByPoints(points: number): TierInfo {
+  if (points >= 500) {
+    return {
+      tier: 'PLATINUM',
+      label: 'Platinum Member',
+      color: '#7c3aed',
+      bgBadge: '#ede9fe',
+      discountPercent: 15,
+      minPoints: 500,
+      nextTierPoints: null
+    };
+  } else if (points >= 200) {
+    return {
+      tier: 'GOLD',
+      label: 'Gold Member',
+      color: '#d97706',
+      bgBadge: '#fef3c7',
+      discountPercent: 10,
+      minPoints: 200,
+      nextTierPoints: 500
+    };
+  } else if (points >= 50) {
+    return {
+      tier: 'SILVER',
+      label: 'Silver Member',
+      color: '#0284c7',
+      bgBadge: '#e0f2fe',
+      discountPercent: 5,
+      minPoints: 50,
+      nextTierPoints: 200
+    };
+  } else {
+    return {
+      tier: 'BRONZE',
+      label: 'Bronze Member',
+      color: '#b45309',
+      bgBadge: '#fef3c7',
+      discountPercent: 0,
+      minPoints: 0,
+      nextTierPoints: 50
+    };
+  }
+}
+
+export let initialVouchers: VoucherPromo[] = [
+  {
+    id: 'v-1',
+    code: 'RESTOQU25K',
+    title: 'Potongan Langsung Rp 25.000',
+    discountType: 'NOMINAL',
+    discountValue: 25000,
+    minSpend: 80000,
+    expiryDate: '2026-12-31',
+    status: 'ACTIVE',
+    usageLimit: 100,
+    usedCount: 28,
+    isHappyHour: false
+  },
+  {
+    id: 'v-2',
+    code: 'HAPPYHOUR20',
+    title: 'Happy Hour Diskon 20% Sore',
+    discountType: 'PERCENT',
+    discountValue: 20,
+    minSpend: 50000,
+    maxDiscount: 30000,
+    expiryDate: '2026-12-31',
+    status: 'ACTIVE',
+    usageLimit: 200,
+    usedCount: 45,
+    isHappyHour: true,
+    happyHourStart: '14:00',
+    happyHourEnd: '17:00'
+  },
+  {
+    id: 'v-3',
+    code: 'MEMBERBARU10',
+    title: 'Diskon 10% Spesial Pelanggan',
+    discountType: 'PERCENT',
+    discountValue: 10,
+    minSpend: 40000,
+    maxDiscount: 20000,
+    expiryDate: '2026-11-30',
+    status: 'ACTIVE',
+    usageLimit: 500,
+    usedCount: 112,
+    isHappyHour: false
+  }
+];
+
+export let initialCustomers: any[] = [
+  {
+    id: 'cust-1',
+    name: 'Andi Pratama',
+    phone: '081234567890',
+    email: 'andi.pratama@gmail.com',
+    visitCount: 12,
+    totalSpend: 1450000,
+    points: 245,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString()
+  },
+  {
+    id: 'cust-2',
+    name: 'Siti Rahmawati',
+    phone: '085712345678',
+    email: 'siti.rahma@yahoo.com',
+    visitCount: 28,
+    totalSpend: 3200000,
+    points: 580,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 60).toISOString()
+  },
+  {
+    id: 'cust-3',
+    name: 'Budi Santoso',
+    phone: '081298765432',
+    email: 'budi.santoso@gmail.com',
+    visitCount: 6,
+    totalSpend: 620000,
+    points: 85,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 14).toISOString()
+  },
+  {
+    id: 'cust-4',
+    name: 'Dewi Lestari',
+    phone: '085211223344',
+    email: 'dewi.lestari@gmail.com',
+    visitCount: 2,
+    totalSpend: 180000,
+    points: 25,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString()
+  }
+];
